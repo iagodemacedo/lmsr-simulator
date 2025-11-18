@@ -256,3 +256,10 @@ else:
     # Table with scroll (showing approximately 10 rows)
     df = pd.DataFrame(rows)
     st.dataframe(df, height=400)
+
+# Footer
+st.markdown("---")
+st.markdown(
+    '<p style="text-align: center; color: #6c757d; font-size: 0.8em;">Por Iago Macedo</p>',
+    unsafe_allow_html=True
+)
