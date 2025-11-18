@@ -61,10 +61,11 @@ with col_slider:
     )
 with col_reset:
     st.markdown("<br>", unsafe_allow_html=True)  # Align button with slider
-    if st.button("Reset", use_container_width=True, help="Reset to 50/50"):
+    if st.button("Reset", key="reset_prob_button", use_container_width=True, help="Reset to 50/50"):
         st.session_state.initial_prob_yes = 50.0
         st.rerun()
 
+# Update session state with slider value (or reset value if button was clicked)
 st.session_state.initial_prob_yes = initial_prob_yes
 initial_prob_no = 100.0 - initial_prob_yes
 
