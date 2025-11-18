@@ -36,8 +36,8 @@ if 'show_json_model' not in st.session_state:
     st.session_state.show_json_model = False
 if 'initial_prob_yes' not in st.session_state:
     st.session_state.initial_prob_yes = 50.0
-if 'reset_prob_clicked' not in st.session_state:
-    st.session_state.reset_prob_clicked = False
+if 'slider_key_counter' not in st.session_state:
+    st.session_state.slider_key_counter = 0
 
 # Parameters section
 st.subheader("Parameters")
@@ -51,12 +51,16 @@ base_fee = st.session_state.base_fee / 100
 # Initial Probabilities
 st.markdown("**Initial Probabilities:**")
 
-# Handle reset button click
-if st.session_state.reset_prob_clicked:
-    st.session_state.initial_prob_yes = 50.0
-    st.session_state.reset_prob_clicked = False
-
+# Handle reset button click - check BEFORE rendering slider
 col_slider, col_reset = st.columns([4, 1])
+with col_reset:
+    st.markdown("<br>", unsafe_allow_html=True)  # Align button with slider
+    if st.button("Reset", key="reset_prob_button", use_container_width=True, help="Reset to 50/50"):
+        st.session_state.initial_prob_yes = 50.0
+        # Increment counter to force slider recreation
+        st.session_state.slider_key_counter += 1
+        st.rerun()
+
 with col_slider:
     initial_prob_yes = st.slider(
         "Initial Probability",
@@ -64,19 +68,12 @@ with col_slider:
         max_value=100.0,
         value=st.session_state.initial_prob_yes,
         step=0.1,
-        key="initial_prob_slider",
+        key=f"initial_prob_slider_{st.session_state.slider_key_counter}",
         help="Probability distribution: Left (YES) | Right (NO)"
     )
-with col_reset:
-    st.markdown("<br>", unsafe_allow_html=True)  # Align button with slider
-    if st.button("Reset", key="reset_prob_button", use_container_width=True, help="Reset to 50/50"):
-        st.session_state.reset_prob_clicked = True
-        st.rerun()
 
-# Update session state with slider value (only if reset was not clicked)
-if not st.session_state.reset_prob_clicked:
-    st.session_state.initial_prob_yes = initial_prob_yes
-
+# Update session state with slider value
+st.session_state.initial_prob_yes = initial_prob_yes
 initial_prob_no = 100.0 - initial_prob_yes
 
 # Display probability values
