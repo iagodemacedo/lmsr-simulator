@@ -36,6 +36,8 @@ if 'show_json_model' not in st.session_state:
     st.session_state.show_json_model = False
 if 'initial_prob_yes' not in st.session_state:
     st.session_state.initial_prob_yes = 50.0
+if 'reset_prob_clicked' not in st.session_state:
+    st.session_state.reset_prob_clicked = False
 
 # Parameters section
 st.subheader("Parameters")
@@ -48,6 +50,12 @@ base_fee = st.session_state.base_fee / 100
 
 # Initial Probabilities
 st.markdown("**Initial Probabilities:**")
+
+# Handle reset button click
+if st.session_state.reset_prob_clicked:
+    st.session_state.initial_prob_yes = 50.0
+    st.session_state.reset_prob_clicked = False
+
 col_slider, col_reset = st.columns([4, 1])
 with col_slider:
     initial_prob_yes = st.slider(
@@ -62,11 +70,13 @@ with col_slider:
 with col_reset:
     st.markdown("<br>", unsafe_allow_html=True)  # Align button with slider
     if st.button("Reset", key="reset_prob_button", use_container_width=True, help="Reset to 50/50"):
-        st.session_state.initial_prob_yes = 50.0
+        st.session_state.reset_prob_clicked = True
         st.rerun()
 
-# Update session state with slider value (or reset value if button was clicked)
-st.session_state.initial_prob_yes = initial_prob_yes
+# Update session state with slider value (only if reset was not clicked)
+if not st.session_state.reset_prob_clicked:
+    st.session_state.initial_prob_yes = initial_prob_yes
+
 initial_prob_no = 100.0 - initial_prob_yes
 
 # Display probability values
@@ -86,12 +96,12 @@ st.subheader("Trades")
 col_import, col_model = st.columns(2)
 
 with col_import:
-    if st.button("Importar JSON", use_container_width=True):
+    if st.button("Import JSON", use_container_width=True):
         st.session_state.show_import_json = not st.session_state.show_import_json
         st.session_state.show_json_model = False
 
 with col_model:
-    if st.button("Modelo JSON", use_container_width=True):
+    if st.button("JSON Template", use_container_width=True):
         st.session_state.show_json_model = not st.session_state.show_json_model
         st.session_state.show_import_json = False
 
@@ -106,22 +116,22 @@ if st.session_state.show_json_model:
     }
     st.json(json_model)
     st.code(json.dumps(json_model, indent=2), language="json")
-    st.info("Copie o JSON acima e use no campo de importação.")
+    st.info("Copy the JSON above and use it in the import field.")
 
 # Import JSON modal
 if st.session_state.show_import_json:
-    st.markdown("**Importar Trades via JSON:**")
+    st.markdown("**Import Trades via JSON:**")
     json_input = st.text_area(
-        "Cole o JSON aqui:",
+        "Paste JSON here:",
         height=200,
         key="json_input",
-        help="Formato esperado: {\"trades\": [{\"direction\": \"YES\", \"shares\": 10}, ...]}"
+        help="Expected format: {\"trades\": [{\"direction\": \"YES\", \"shares\": 10}, ...]}"
     )
     
     col_confirm, col_cancel = st.columns(2)
     
     with col_confirm:
-        if st.button("Confirmar Importação", use_container_width=True, type="primary"):
+        if st.button("Confirm Import", use_container_width=True, type="primary"):
             try:
                 data = json.loads(json_input)
                 if "trades" in data and isinstance(data["trades"], list):
@@ -137,19 +147,19 @@ if st.session_state.show_import_json:
                     if imported_trades:
                         st.session_state.trades = imported_trades
                         st.session_state.show_import_json = False
-                        st.success(f"Importadas {len(imported_trades)} trades com sucesso!")
+                        st.success(f"Imported {len(imported_trades)} trades successfully!")
                         st.rerun()
                     else:
-                        st.error("Nenhuma trade válida encontrada no JSON.")
+                        st.error("No valid trades found in JSON.")
                 else:
-                    st.error("Formato JSON inválido. Use o botão 'Modelo JSON' para ver o formato esperado.")
+                    st.error("Invalid JSON format. Use the 'JSON Template' button to see the expected format.")
             except json.JSONDecodeError:
-                st.error("JSON inválido. Verifique a sintaxe.")
+                st.error("Invalid JSON. Check the syntax.")
             except Exception as e:
-                st.error(f"Erro ao importar: {str(e)}")
+                st.error(f"Error importing: {str(e)}")
     
     with col_cancel:
-        if st.button("Cancelar", use_container_width=True):
+        if st.button("Cancel", use_container_width=True):
             st.session_state.show_import_json = False
             st.rerun()
 
@@ -312,6 +322,6 @@ else:
 # Footer
 st.markdown("---")
 st.markdown(
-    '<p style="text-align: center; color: #6c757d; font-size: 0.8em;">Por Iago Macedo</p>',
+    '<p style="text-align: center; color: #6c757d; font-size: 0.8em;">By Iago Macedo</p>',
     unsafe_allow_html=True
 )
