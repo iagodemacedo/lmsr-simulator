@@ -28,33 +28,23 @@ if 'base_fee' not in st.session_state:
 if 'trade_count' not in st.session_state:
     st.session_state.trade_count = 10
 
-# Base b Parameter with slider and input
-col1_b, col2_b = st.columns([3, 1])
-with col1_b:
-    base_b_slider = st.slider("Base b Parameter", 10, 1000, int(st.session_state.base_b), key="base_b_slider")
-    st.session_state.base_b = base_b_slider
-with col2_b:
-    base_b = st.number_input("", min_value=10, max_value=1000, value=int(st.session_state.base_b), step=1, key="base_b_input", label_visibility="collapsed")
-    st.session_state.base_b = base_b
+# Parameters section
+st.subheader("Parameters")
+base_b = st.number_input("Base b Parameter", value=st.session_state.base_b, step=1, key="base_b_input")
+st.session_state.base_b = base_b
 
-# Base Fee Rate with slider and input
-col1_fee, col2_fee = st.columns([3, 1])
-with col1_fee:
-    base_fee_slider = st.slider("Base Fee Rate (%)", 0.0, 10.0, st.session_state.base_fee, step=0.1, key="base_fee_slider")
-    st.session_state.base_fee = float(base_fee_slider)
-with col2_fee:
-    base_fee_input = st.number_input("", min_value=0.0, max_value=10.0, value=st.session_state.base_fee, step=0.1, key="base_fee_input", label_visibility="collapsed")
-    st.session_state.base_fee = base_fee_input
+base_fee_input = st.number_input("Base Fee Rate (%)", value=st.session_state.base_fee, step=0.1, key="base_fee_input")
+st.session_state.base_fee = base_fee_input
 base_fee = st.session_state.base_fee / 100
 
-# Number of Trades with slider and input
-col1_trades, col2_trades = st.columns([3, 1])
-with col1_trades:
-    trade_count_slider = st.slider("Number of Trades", 1, 20, int(st.session_state.trade_count), key="trade_count_slider")
-    st.session_state.trade_count = trade_count_slider
-with col2_trades:
-    trade_count = st.number_input("", min_value=1, max_value=20, value=int(st.session_state.trade_count), step=1, key="trade_count_input", label_visibility="collapsed")
-    st.session_state.trade_count = trade_count
+trade_count = st.number_input("Number of Trades", min_value=1, max_value=1000, value=int(st.session_state.trade_count), step=1, key="trade_count_input")
+st.session_state.trade_count = trade_count
+
+# Visual separator
+st.divider()
+
+# Trades section
+st.subheader("Trades")
 
 trades = []
 for i in range(trade_count):
@@ -113,9 +103,9 @@ st.subheader("Simulation Results")
 df = pd.DataFrame(rows)
 st.dataframe(df)
 
-st.markdown(f"**Total Cost Paid:** {total_cost:.2f} USDC")
-st.markdown(f"**Total Fees Earned:** {total_fee:.2f} USDC")
-st.markdown(f"**Final Payout:** {payout:.2f} USDC")
+st.markdown(f"**Total Cost Paid:** {total_cost:.2f} BRL")
+st.markdown(f"**Total Fees Earned:** {total_fee:.2f} BRL")
+st.markdown(f"**Final Payout:** {payout:.2f} BRL")
 
 net_worth = total_fee + total_cost - payout
-st.markdown(f"**Net Worth:** {net_worth:.2f} USDC")
+st.markdown(f"**Net Worth:** {net_worth:.2f} BRL")
