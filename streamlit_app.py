@@ -1,6 +1,7 @@
 import streamlit as st
 import numpy as np
 import pandas as pd
+import json
 
 # LMSR functions
 def calc_cost(q_yes, q_no, b):
@@ -29,6 +30,10 @@ if 'trades' not in st.session_state:
     st.session_state.trades = []
 if 'final_outcome' not in st.session_state:
     st.session_state.final_outcome = "YES"
+if 'show_import_json' not in st.session_state:
+    st.session_state.show_import_json = False
+if 'show_json_model' not in st.session_state:
+    st.session_state.show_json_model = False
 
 # Parameters section
 st.subheader("Parameters")
@@ -45,12 +50,83 @@ st.divider()
 # Trades section
 st.subheader("Trades")
 
+# Import JSON buttons
+col_import, col_model = st.columns(2)
+
+with col_import:
+    if st.button("Importar JSON", use_container_width=True):
+        st.session_state.show_import_json = not st.session_state.show_import_json
+        st.session_state.show_json_model = False
+
+with col_model:
+    if st.button("Modelo JSON", use_container_width=True):
+        st.session_state.show_json_model = not st.session_state.show_json_model
+        st.session_state.show_import_json = False
+
+# Show JSON model
+if st.session_state.show_json_model:
+    json_model = {
+        "trades": [
+            {"direction": "YES", "shares": 10},
+            {"direction": "NO", "shares": 5},
+            {"direction": "YES", "shares": 20}
+        ]
+    }
+    st.json(json_model)
+    st.code(json.dumps(json_model, indent=2), language="json")
+    st.info("Copie o JSON acima e use no campo de importação.")
+
+# Import JSON modal
+if st.session_state.show_import_json:
+    st.markdown("**Importar Trades via JSON:**")
+    json_input = st.text_area(
+        "Cole o JSON aqui:",
+        height=200,
+        key="json_input",
+        help="Formato esperado: {\"trades\": [{\"direction\": \"YES\", \"shares\": 10}, ...]}"
+    )
+    
+    col_confirm, col_cancel = st.columns(2)
+    
+    with col_confirm:
+        if st.button("Confirmar Importação", use_container_width=True, type="primary"):
+            try:
+                data = json.loads(json_input)
+                if "trades" in data and isinstance(data["trades"], list):
+                    imported_trades = []
+                    for trade in data["trades"]:
+                        if "direction" in trade and "shares" in trade:
+                            direction = trade["direction"].upper()
+                            if direction in ["YES", "NO"]:
+                                shares = int(trade["shares"])
+                                if shares > 0:
+                                    imported_trades.append((direction, shares))
+                    
+                    if imported_trades:
+                        st.session_state.trades = imported_trades
+                        st.session_state.show_import_json = False
+                        st.success(f"Importadas {len(imported_trades)} trades com sucesso!")
+                        st.rerun()
+                    else:
+                        st.error("Nenhuma trade válida encontrada no JSON.")
+                else:
+                    st.error("Formato JSON inválido. Use o botão 'Modelo JSON' para ver o formato esperado.")
+            except json.JSONDecodeError:
+                st.error("JSON inválido. Verifique a sintaxe.")
+            except Exception as e:
+                st.error(f"Erro ao importar: {str(e)}")
+    
+    with col_cancel:
+        if st.button("Cancelar", use_container_width=True):
+            st.session_state.show_import_json = False
+            st.rerun()
+
 # Display existing trades in a table
 if st.session_state.trades:
     trades_df = pd.DataFrame(st.session_state.trades, columns=["Direction", "Shares"])
     st.dataframe(trades_df, height=200, use_container_width=True)
 else:
-    st.info("No trades added yet. Add a trade below.")
+    st.info("No trades added yet. Add a trade below or import via JSON.")
 
 # Add new trade section
 st.markdown("**Add New Trade:**")
