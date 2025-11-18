@@ -3,27 +3,83 @@ import numpy as np
 import pandas as pd
 import json
 
-# LMSR functions
-def calc_cost(q_yes, q_no, b):
-    return b * np.log(np.exp(q_yes / b) + np.exp(q_no / b))
+# CPMM functions
+def get_prices(x, y):
+    """Calculate YES and NO prices based on CPMM formula"""
+    total = x + y
+    if total == 0:
+        return 0.5, 0.5
+    price_yes = y / total
+    price_no = x / total
+    return price_yes, price_no
 
-def dynamic_fee(q_yes, q_no, base_fee=0.02):
+def calc_cost_cpmm(x, y, direction, shares):
+    """
+    Calculate cost of buying shares in CPMM
+    X * Y = K (constant)
+    
+    X = quantity of NO shares in the pool
+    Y = quantity of YES shares in the pool
+    
+    When buying YES shares (delta_y):
+    - Y_new = Y + delta_y (increases YES shares)
+    - X_new = K / Y_new = (X * Y) / (Y + delta_y) (decreases NO shares)
+    - Cost = X - X_new (paid by removing NO shares)
+    
+    When buying NO shares (delta_x):
+    - X_new = X + delta_x (increases NO shares)
+    - Y_new = K / X_new = (X * Y) / (X + delta_x) (decreases YES shares)
+    - Cost = Y - Y_new (paid by removing YES shares)
+    """
+    k = x * y
+    
+    if k == 0:
+        # Edge case: initialize with minimal liquidity
+        k = 1.0
+        x = 1.0
+        y = 1.0
+    
+    if direction == "YES":
+        # Buying YES shares: Y increases, X decreases
+        y_new = y + shares
+        x_new = k / y_new
+        cost = x - x_new
+    else:  # direction == "NO"
+        # Buying NO shares: X increases, Y decreases
+        x_new = x + shares
+        y_new = k / x_new
+        cost = y - y_new
+    
+    return cost, x_new, y_new
+
+def dynamic_fee(x, y, base_fee=0.02):
+    """Fee rate (can be made dynamic based on pool state if needed)"""
     return base_fee
 
-def dynamic_b(q_yes, q_no, base_b=100, min_b=30):
-    total = q_yes + q_no
-    if total == 0:
-        return base_b
-    imbalance_ratio = abs(q_yes - q_no) / total
-    # return max(min_b, base_b * (1 - 0.6 * imbalance_ratio))
-    return base_b
+def format_number(num):
+    """Format number with thousand separators (Brazilian format: 1.000,00)"""
+    # Format with comma as thousand separator and dot as decimal
+    formatted = f"{num:,.2f}"
+    # Replace comma with dot for thousands, and dot with comma for decimals
+    parts = formatted.split(".")
+    if len(parts) == 2:
+        integer_part = parts[0].replace(",", ".")
+        decimal_part = parts[1]
+        return f"{integer_part},{decimal_part}"
+    return formatted.replace(",", ".")
+
+def format_price(price):
+    """Format price with 2 decimal places and BRL currency (Brazilian format: 1.234,56 BRL)"""
+    # Format number with Brazilian format and add BRL
+    formatted_num = format_number(price)
+    return f"{formatted_num} BRL"
 
 # Streamlit UI
-st.title("LMSR Simulator")
+st.title("CPMM Simulator")
 
 # Initialize session state
-if 'base_b' not in st.session_state:
-    st.session_state.base_b = 100
+if 'initial_liquidity' not in st.session_state:
+    st.session_state.initial_liquidity = 1000.0
 if 'base_fee' not in st.session_state:
     st.session_state.base_fee = 2.0
 if 'trades' not in st.session_state:
@@ -41,8 +97,8 @@ if 'slider_key_counter' not in st.session_state:
 
 # Parameters section
 st.subheader("Parameters")
-base_b = st.number_input("Base b Parameter", value=st.session_state.base_b, step=1, key="base_b_input")
-st.session_state.base_b = base_b
+initial_liquidity = st.number_input("Initial Liquidity (X + Y)", value=st.session_state.initial_liquidity, step=100.0, min_value=100.0, key="initial_liquidity_input", help="Total initial liquidity in the pool")
+st.session_state.initial_liquidity = initial_liquidity
 
 base_fee_input = st.number_input("Base Fee Rate (%)", value=st.session_state.base_fee, step=0.1, key="base_fee_input")
 st.session_state.base_fee = base_fee_input
@@ -236,66 +292,106 @@ with col_no:
 final_outcome = st.session_state.final_outcome
 
 # Simulation logic
-# Calculate initial q_yes and q_no based on initial probabilities
-# P(YES) = e^(q_yes/b) / (e^(q_yes/b) + e^(q_no/b))
-# If we set q_no = 0 as reference: q_yes = b * ln(p_yes / p_no)
+# Calculate initial X and Y based on initial probabilities
+# P(YES) = Y / (X + Y) => Y = P_yes * (X + Y)
+# P(NO) = X / (X + Y) => X = P_no * (X + Y)
 p_yes = initial_prob_yes / 100.0
 p_no = initial_prob_no / 100.0
 
-if p_yes > 0 and p_no > 0:
-    q_yes = base_b * np.log(p_yes / p_no)
-    q_no = 0.0
-elif p_yes == 0:
-    # Extreme case: 0% YES probability
-    q_yes = -base_b * 10  # Very negative
-    q_no = 0.0
-elif p_no == 0:
-    # Extreme case: 100% YES probability
-    q_yes = base_b * 10  # Very positive
-    q_no = 0.0
-else:
-    # Default: 50/50
-    q_yes = 0.0
-    q_no = 0.0
+# Initialize pool with probabilities
+total_liquidity = initial_liquidity
+x = p_no * total_liquidity  # NO shares
+y = p_yes * total_liquidity  # YES shares
+
+# Ensure minimum liquidity to avoid division by zero
+if x == 0:
+    x = 0.01
+if y == 0:
+    y = 0.01
+
+k = x * y  # Constant product
 
 total_cost = 0
 total_fee = 0
 rows = []
+x_current = x
+y_current = y
+k_current = k
+total_shares_yes = 0  # Total YES shares bought by user
+total_shares_no = 0   # Total NO shares bought by user
+
+# Display initial state
+st.markdown("### 📊 Initial Pool State")
+st.divider()
+
+price_yes_init, price_no_init = get_prices(x_current, y_current)
+
+# Organize in two rows: first row for quantities, second row for prices
+col1, col2, col3 = st.columns(3)
+with col1:
+    st.markdown("**Quantities:**")
+    st.metric("X (NO Shares)", format_number(x_current))
+    st.metric("Y (YES Shares)", format_number(y_current))
+    
+with col2:
+    st.markdown("**Liquidity:**")
+    st.metric("K (Constant)", format_number(k_current))
+    
+with col3:
+    st.markdown("**Prices:**")
+    st.metric("Price YES", format_price(price_yes_init))
+    st.metric("Price NO", format_price(price_no_init))
+
+st.divider()
 
 for direction, shares in trades:
-    b_now = dynamic_b(q_yes, q_no, base_b)
-    cost_before = calc_cost(q_yes, q_no, b_now)
-
-    if direction == "YES":
-        q_yes_new = q_yes + shares
-        q_no_new = q_no
-    else:
-        q_yes_new = q_yes
-        q_no_new = q_no + shares
-
-    cost_after = calc_cost(q_yes_new, q_no_new, b_now)
-    cost = cost_after - cost_before
-    fee_rate = dynamic_fee(q_yes, q_no, base_fee)
+    # Calculate cost and new pool state
+    cost, x_new, y_new = calc_cost_cpmm(x_current, y_current, direction, shares)
+    
+    # Apply fee
+    fee_rate = dynamic_fee(x_current, y_current, base_fee)
     fee = cost * fee_rate
-
-    total_cost += cost
+    cost_after_fee = cost + fee  # User pays cost + fee
+    
+    total_cost += cost_after_fee
     total_fee += fee
-    q_yes, q_no = q_yes_new, q_no_new
-
-    avg_price = cost / shares if shares > 0 else 0
+    
+    # Track shares bought by user
+    if direction == "YES":
+        total_shares_yes += shares
+    else:
+        total_shares_no += shares
+    
+    # Update pool state
+    x_current = x_new
+    y_current = y_new
+    k_current = x_current * y_current
+    
+    # Calculate current prices
+    price_yes_curr, price_no_curr = get_prices(x_current, y_current)
+    
+    avg_price = cost_after_fee / shares if shares > 0 else 0
     
     rows.append({
         "Direction": direction,
         "Shares": shares,
-        "b Used": round(b_now, 2),
-        "Fee Rate": round(fee_rate, 4),
-        "Cost Paid": round(cost, 4),
-        "Avg. Price": round(avg_price, 4),
-        "Fee Earned": round(fee, 4)
+        "X (NO)": format_number(x_current),
+        "Y (YES)": format_number(y_current),
+        "K": format_number(k_current),
+        "Price YES": format_price(price_yes_curr),
+        "Price NO": format_price(price_no_curr),
+        "Fee Rate": f"{fee_rate*100:.2f}%",
+        "Cost Paid": format_price(cost_after_fee),
+        "Avg. Price": format_price(avg_price),
+        "Fee Earned": format_price(fee)
     })
 
-payout = q_yes if final_outcome == "YES" else q_no
-net_worth = total_fee + total_cost - payout
+# Final payout: user receives shares of the winning outcome
+# In CPMM, payout is the number of shares the user owns of the winning outcome
+payout = total_shares_yes if final_outcome == "YES" else total_shares_no
+# Net worth = Total Cost Paid + Total Fees - Payout
+# Assuming each share is worth 1 BRL at payout
+net_worth = total_cost + total_fee - payout
 
 # Results
 st.subheader("Simulation Results")
@@ -304,13 +400,45 @@ if not trades:
     st.warning("No trades to simulate. Please add trades above.")
 else:
     # Summary before table
-    st.markdown(f"**Total Cost Paid:** {total_cost:.2f} BRL")
-    st.markdown(f"**Total Fees Earned:** {total_fee:.2f} BRL")
-    st.markdown(f"**Final Payout:** {payout:.2f} BRL")
+    st.markdown("### 💰 Financial Summary")
+    col_sum1, col_sum2, col_sum3 = st.columns(3)
+    with col_sum1:
+        st.metric("Total Cost Paid", format_price(total_cost))
+    with col_sum2:
+        st.metric("Total Fees Earned", format_price(total_fee))
+    with col_sum3:
+        # Payout as monetary value (each share worth 1 BRL)
+        payout_value = payout  # Each share is worth 1 BRL
+        st.metric(f"Payout ({final_outcome})", format_price(payout_value))
+    
+    st.divider()
+    
+    # Final pool state
+    st.markdown("### 📊 Final Pool State")
+    price_yes_final, price_no_final = get_prices(x_current, y_current)
+    
+    # Organize in two rows: first row for quantities, second row for prices
+    col_f1, col_f2, col_f3 = st.columns(3)
+    with col_f1:
+        st.markdown("**Quantities:**")
+        st.metric("X (NO Shares)", format_number(x_current))
+        st.metric("Y (YES Shares)", format_number(y_current))
+        
+    with col_f2:
+        st.markdown("**Liquidity:**")
+        st.metric("K (Constant)", format_number(k_current))
+        
+    with col_f3:
+        st.markdown("**Prices:**")
+        st.metric("Price YES", format_price(price_yes_final))
+        st.metric("Price NO", format_price(price_no_final))
+    
+    st.divider()
 
     # Net Worth with conditional color
+    st.markdown("### 📈 Net Worth")
     net_worth_color = "red" if net_worth < 0 else "green"
-    st.markdown(f"**Net Worth:** <span style='color:{net_worth_color}'>{net_worth:.2f} BRL</span>", unsafe_allow_html=True)
+    st.markdown(f"<span style='color:{net_worth_color}; font-size: 1.5em; font-weight: bold'>{format_price(net_worth)}</span>", unsafe_allow_html=True)
 
     # Table with scroll (showing approximately 10 rows)
     df = pd.DataFrame(rows)
