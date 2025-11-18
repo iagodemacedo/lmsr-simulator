@@ -25,8 +25,8 @@ if 'base_b' not in st.session_state:
     st.session_state.base_b = 100
 if 'base_fee' not in st.session_state:
     st.session_state.base_fee = 2.0
-if 'trade_count' not in st.session_state:
-    st.session_state.trade_count = 10
+if 'trades' not in st.session_state:
+    st.session_state.trades = []
 if 'final_outcome' not in st.session_state:
     st.session_state.final_outcome = "YES"
 
@@ -39,23 +39,34 @@ base_fee_input = st.number_input("Base Fee Rate (%)", value=st.session_state.bas
 st.session_state.base_fee = base_fee_input
 base_fee = st.session_state.base_fee / 100
 
-trade_count = st.number_input("Number of Trades", min_value=1, max_value=1000, value=int(st.session_state.trade_count), step=1, key="trade_count_input")
-st.session_state.trade_count = trade_count
-
 # Visual separator
 st.divider()
 
 # Trades section
 st.subheader("Trades")
 
-trades = []
-for i in range(trade_count):
-    col1, col2 = st.columns(2)
-    with col1:
-        direction = st.selectbox(f"Trade {i+1} Direction", ["YES", "NO"], key=f"dir{i}")
-    with col2:
-        shares = st.number_input(f"Shares for Trade {i+1}", min_value=1, max_value=10000, value=10, step=1, key=f"sh{i}")
-    trades.append((direction, shares))
+# Display existing trades in a table
+if st.session_state.trades:
+    trades_df = pd.DataFrame(st.session_state.trades, columns=["Direction", "Shares"])
+    st.dataframe(trades_df, height=200, use_container_width=True)
+else:
+    st.info("No trades added yet. Add a trade below.")
+
+# Add new trade section
+st.markdown("**Add New Trade:**")
+col_dir, col_shares = st.columns(2)
+
+with col_dir:
+    new_direction = st.selectbox("Trade Direction", ["YES", "NO"], key="new_trade_direction")
+
+with col_shares:
+    new_shares = st.number_input("Shares", min_value=1, value=10, step=1, key="new_trade_shares")
+
+if st.button("Add Trade", use_container_width=True, type="primary"):
+    st.session_state.trades.append((new_direction, new_shares))
+    st.rerun()
+
+trades = st.session_state.trades
 
 # Final Outcome buttons
 st.markdown("**Final Outcome of Market:**")
@@ -154,15 +165,18 @@ net_worth = total_fee + total_cost - payout
 # Results
 st.subheader("Simulation Results")
 
-# Summary before table
-st.markdown(f"**Total Cost Paid:** {total_cost:.2f} BRL")
-st.markdown(f"**Total Fees Earned:** {total_fee:.2f} BRL")
-st.markdown(f"**Final Payout:** {payout:.2f} BRL")
+if not trades:
+    st.warning("No trades to simulate. Please add trades above.")
+else:
+    # Summary before table
+    st.markdown(f"**Total Cost Paid:** {total_cost:.2f} BRL")
+    st.markdown(f"**Total Fees Earned:** {total_fee:.2f} BRL")
+    st.markdown(f"**Final Payout:** {payout:.2f} BRL")
 
-# Net Worth with conditional color
-net_worth_color = "red" if net_worth < 0 else "green"
-st.markdown(f"**Net Worth:** <span style='color:{net_worth_color}'>{net_worth:.2f} BRL</span>", unsafe_allow_html=True)
+    # Net Worth with conditional color
+    net_worth_color = "red" if net_worth < 0 else "green"
+    st.markdown(f"**Net Worth:** <span style='color:{net_worth_color}'>{net_worth:.2f} BRL</span>", unsafe_allow_html=True)
 
-# Table with scroll (showing approximately 10 rows)
-df = pd.DataFrame(rows)
-st.dataframe(df, height=400)
+    # Table with scroll (showing approximately 10 rows)
+    df = pd.DataFrame(rows)
+    st.dataframe(df, height=400)
