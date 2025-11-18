@@ -34,6 +34,8 @@ if 'show_import_json' not in st.session_state:
     st.session_state.show_import_json = False
 if 'show_json_model' not in st.session_state:
     st.session_state.show_json_model = False
+if 'initial_prob_yes' not in st.session_state:
+    st.session_state.initial_prob_yes = 50.0
 
 # Parameters section
 st.subheader("Parameters")
@@ -43,6 +45,27 @@ st.session_state.base_b = base_b
 base_fee_input = st.number_input("Base Fee Rate (%)", value=st.session_state.base_fee, step=0.1, key="base_fee_input")
 st.session_state.base_fee = base_fee_input
 base_fee = st.session_state.base_fee / 100
+
+# Initial Probabilities
+st.markdown("**Initial Probabilities:**")
+initial_prob_yes = st.slider(
+    "Initial Probability",
+    min_value=0.0,
+    max_value=100.0,
+    value=st.session_state.initial_prob_yes,
+    step=0.1,
+    key="initial_prob_slider",
+    help="Probability distribution: Left (YES) | Right (NO)"
+)
+st.session_state.initial_prob_yes = initial_prob_yes
+initial_prob_no = 100.0 - initial_prob_yes
+
+# Display probability values
+col_prob_yes, col_prob_no = st.columns(2)
+with col_prob_yes:
+    st.metric("YES", f"{initial_prob_yes:.1f}%")
+with col_prob_no:
+    st.metric("NO", f"{initial_prob_no:.1f}%")
 
 # Visual separator
 st.divider()
@@ -197,8 +220,28 @@ with col_no:
 final_outcome = st.session_state.final_outcome
 
 # Simulation logic
-q_yes = 0
-q_no = 0
+# Calculate initial q_yes and q_no based on initial probabilities
+# P(YES) = e^(q_yes/b) / (e^(q_yes/b) + e^(q_no/b))
+# If we set q_no = 0 as reference: q_yes = b * ln(p_yes / p_no)
+p_yes = initial_prob_yes / 100.0
+p_no = initial_prob_no / 100.0
+
+if p_yes > 0 and p_no > 0:
+    q_yes = base_b * np.log(p_yes / p_no)
+    q_no = 0.0
+elif p_yes == 0:
+    # Extreme case: 0% YES probability
+    q_yes = -base_b * 10  # Very negative
+    q_no = 0.0
+elif p_no == 0:
+    # Extreme case: 100% YES probability
+    q_yes = base_b * 10  # Very positive
+    q_no = 0.0
+else:
+    # Default: 50/50
+    q_yes = 0.0
+    q_no = 0.0
+
 total_cost = 0
 total_fee = 0
 rows = []
