@@ -97,15 +97,20 @@ for direction, shares in trades:
     })
 
 payout = q_yes if final_outcome == "YES" else q_no
+net_worth = total_fee + total_cost - payout
 
 # Results
 st.subheader("Simulation Results")
-df = pd.DataFrame(rows)
-st.dataframe(df)
 
+# Summary before table
 st.markdown(f"**Total Cost Paid:** {total_cost:.2f} BRL")
 st.markdown(f"**Total Fees Earned:** {total_fee:.2f} BRL")
 st.markdown(f"**Final Payout:** {payout:.2f} BRL")
 
-net_worth = total_fee + total_cost - payout
-st.markdown(f"**Net Worth:** {net_worth:.2f} BRL")
+# Net Worth with conditional color
+net_worth_color = "red" if net_worth < 0 else "green"
+st.markdown(f"**Net Worth:** <span style='color:{net_worth_color}'>{net_worth:.2f} BRL</span>", unsafe_allow_html=True)
+
+# Table with scroll (showing approximately 10 rows)
+df = pd.DataFrame(rows)
+st.dataframe(df, height=400)
