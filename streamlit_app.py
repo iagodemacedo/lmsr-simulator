@@ -48,15 +48,23 @@ base_fee = st.session_state.base_fee / 100
 
 # Initial Probabilities
 st.markdown("**Initial Probabilities:**")
-initial_prob_yes = st.slider(
-    "Initial Probability",
-    min_value=0.0,
-    max_value=100.0,
-    value=st.session_state.initial_prob_yes,
-    step=0.1,
-    key="initial_prob_slider",
-    help="Probability distribution: Left (YES) | Right (NO)"
-)
+col_slider, col_reset = st.columns([4, 1])
+with col_slider:
+    initial_prob_yes = st.slider(
+        "Initial Probability",
+        min_value=0.0,
+        max_value=100.0,
+        value=st.session_state.initial_prob_yes,
+        step=0.1,
+        key="initial_prob_slider",
+        help="Probability distribution: Left (YES) | Right (NO)"
+    )
+with col_reset:
+    st.markdown("<br>", unsafe_allow_html=True)  # Align button with slider
+    if st.button("Reset", use_container_width=True, help="Reset to 50/50"):
+        st.session_state.initial_prob_yes = 50.0
+        st.rerun()
+
 st.session_state.initial_prob_yes = initial_prob_yes
 initial_prob_no = 100.0 - initial_prob_yes
 
