@@ -60,38 +60,52 @@ for i in range(trade_count):
 # Final Outcome buttons
 st.markdown("**Final Outcome of Market:**")
 
+yes_selected = st.session_state.final_outcome == "YES"
+no_selected = st.session_state.final_outcome == "NO"
+
+# CSS to style buttons based on selection state
+st.markdown(f"""
+<style>
+    /* Style for YES button - both primary and secondary */
+    div[data-testid="column"]:first-of-type button {{
+        background-color: {'#28a745' if yes_selected else '#f8f9fa'} !important;
+        color: {'white' if yes_selected else '#6c757d'} !important;
+        border: 2px solid {'#28a745' if yes_selected else '#dee2e6'} !important;
+        font-weight: {'bold' if yes_selected else 'normal'} !important;
+    }}
+    div[data-testid="column"]:first-of-type button:hover {{
+        background-color: {'#218838' if yes_selected else '#e9ecef'} !important;
+        border-color: {'#1e7e34' if yes_selected else '#adb5bd'} !important;
+    }}
+    /* Style for NO button - both primary and secondary */
+    div[data-testid="column"]:last-of-type button {{
+        background-color: {'#dc3545' if no_selected else '#f8f9fa'} !important;
+        color: {'white' if no_selected else '#6c757d'} !important;
+        border: 2px solid {'#dc3545' if no_selected else '#dee2e6'} !important;
+        font-weight: {'bold' if no_selected else 'normal'} !important;
+    }}
+    div[data-testid="column"]:last-of-type button:hover {{
+        background-color: {'#c82333' if no_selected else '#e9ecef'} !important;
+        border-color: {'#bd2130' if no_selected else '#adb5bd'} !important;
+    }}
+</style>
+""", unsafe_allow_html=True)
+
 col_yes, col_no = st.columns(2)
 
 with col_yes:
-    if st.button("YES", key="btn_yes", use_container_width=True):
+    # Use type="primary" when selected to make it more visible
+    button_type = "primary" if yes_selected else "secondary"
+    if st.button("YES", key="btn_yes", use_container_width=True, type=button_type):
         st.session_state.final_outcome = "YES"
         st.rerun()
 
 with col_no:
-    if st.button("NO", key="btn_no", use_container_width=True):
+    # Use type="primary" when selected to make it more visible
+    button_type = "primary" if no_selected else "secondary"
+    if st.button("NO", key="btn_no", use_container_width=True, type=button_type):
         st.session_state.final_outcome = "NO"
         st.rerun()
-
-# Apply custom colors via CSS
-yes_color = "#28a745" if st.session_state.final_outcome == "YES" else "#f8f9fa"
-no_color = "#dc3545" if st.session_state.final_outcome == "NO" else "#f8f9fa"
-yes_text_color = "white" if st.session_state.final_outcome == "YES" else "#6c757d"
-no_text_color = "white" if st.session_state.final_outcome == "NO" else "#6c757d"
-
-st.markdown(f"""
-<style>
-    button[data-testid="baseButton-secondary"][aria-label*="YES"] {{
-        background-color: {yes_color} !important;
-        color: {yes_text_color} !important;
-        border: 2px solid {yes_color} !important;
-    }}
-    button[data-testid="baseButton-secondary"][aria-label*="NO"] {{
-        background-color: {no_color} !important;
-        color: {no_text_color} !important;
-        border: 2px solid {no_color} !important;
-    }}
-</style>
-""", unsafe_allow_html=True)
 
 final_outcome = st.session_state.final_outcome
 
