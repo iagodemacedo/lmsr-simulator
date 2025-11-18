@@ -27,6 +27,8 @@ if 'base_fee' not in st.session_state:
     st.session_state.base_fee = 2.0
 if 'trade_count' not in st.session_state:
     st.session_state.trade_count = 10
+if 'final_outcome' not in st.session_state:
+    st.session_state.final_outcome = "YES"
 
 # Parameters section
 st.subheader("Parameters")
@@ -55,7 +57,43 @@ for i in range(trade_count):
         shares = st.number_input(f"Shares for Trade {i+1}", min_value=1, max_value=10000, value=10, step=1, key=f"sh{i}")
     trades.append((direction, shares))
 
-final_outcome = st.selectbox("Final Outcome of Market", ["YES", "NO"])
+# Final Outcome buttons
+st.markdown("**Final Outcome of Market:**")
+
+col_yes, col_no = st.columns(2)
+
+with col_yes:
+    if st.button("YES", key="btn_yes", use_container_width=True):
+        st.session_state.final_outcome = "YES"
+        st.rerun()
+
+with col_no:
+    if st.button("NO", key="btn_no", use_container_width=True):
+        st.session_state.final_outcome = "NO"
+        st.rerun()
+
+# Apply custom colors via CSS
+yes_color = "#28a745" if st.session_state.final_outcome == "YES" else "#f8f9fa"
+no_color = "#dc3545" if st.session_state.final_outcome == "NO" else "#f8f9fa"
+yes_text_color = "white" if st.session_state.final_outcome == "YES" else "#6c757d"
+no_text_color = "white" if st.session_state.final_outcome == "NO" else "#6c757d"
+
+st.markdown(f"""
+<style>
+    button[data-testid="baseButton-secondary"][aria-label*="YES"] {{
+        background-color: {yes_color} !important;
+        color: {yes_text_color} !important;
+        border: 2px solid {yes_color} !important;
+    }}
+    button[data-testid="baseButton-secondary"][aria-label*="NO"] {{
+        background-color: {no_color} !important;
+        color: {no_text_color} !important;
+        border: 2px solid {no_color} !important;
+    }}
+</style>
+""", unsafe_allow_html=True)
+
+final_outcome = st.session_state.final_outcome
 
 # Simulation logic
 q_yes = 0
