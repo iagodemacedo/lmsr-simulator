@@ -2,10 +2,18 @@ import streamlit as st
 import numpy as np
 import pandas as pd
 import json
+import matplotlib.pyplot as plt
 
 # LMSR functions
 def calc_cost(q_yes, q_no, b):
     return b * np.log(np.exp(q_yes / b) + np.exp(q_no / b))
+
+def calc_price(q_yes, q_no, b):
+    """Calculate the price of YES shares. NO price is always 1 - YES price."""
+    exp_yes = np.exp(q_yes / b)
+    exp_no = np.exp(q_no / b)
+    price_yes = exp_yes / (exp_yes + exp_no)
+    return price_yes
 
 def dynamic_fee(q_yes, q_no, base_fee=0.02):
     return base_fee
@@ -262,16 +270,34 @@ total_cost = 0
 total_fee = 0
 rows = []
 
-for direction, shares in trades:
+# Track user's purchased shares separately (for payout calculation)
+user_q_yes = 0
+user_q_no = 0
+
+# Track price evolution for chart
+price_history = []
+
+# Calculate initial prices before any trades
+b_initial = dynamic_b(q_yes, q_no, base_b)
+initial_price_yes = calc_price(q_yes, q_no, b_initial)
+price_history.append({
+    "Trade": 0,
+    "YES Price": initial_price_yes,
+    "NO Price": 1.0 - initial_price_yes
+})
+
+for idx, (direction, shares) in enumerate(trades, start=1):
     b_now = dynamic_b(q_yes, q_no, base_b)
     cost_before = calc_cost(q_yes, q_no, b_now)
 
     if direction == "YES":
         q_yes_new = q_yes + shares
         q_no_new = q_no
+        user_q_yes += shares  # Track user's shares
     else:
         q_yes_new = q_yes
         q_no_new = q_no + shares
+        user_q_no += shares  # Track user's shares
 
     cost_after = calc_cost(q_yes_new, q_no_new, b_now)
     cost = cost_after - cost_before
@@ -281,6 +307,15 @@ for direction, shares in trades:
     total_cost += cost
     total_fee += fee
     q_yes, q_no = q_yes_new, q_no_new
+
+    # Calculate prices after this trade
+    price_yes = calc_price(q_yes, q_no, b_now)
+    price_no = 1.0 - price_yes
+    price_history.append({
+        "Trade": idx,
+        "YES Price": price_yes,
+        "NO Price": price_no
+    })
 
     avg_price = cost / shares if shares > 0 else 0
     
@@ -294,8 +329,14 @@ for direction, shares in trades:
         "Fee Earned": round(fee, 4)
     })
 
-payout = q_yes if final_outcome == "YES" else q_no
+# Payout is based only on user's purchased shares, not market state
+payout = user_q_yes if final_outcome == "YES" else user_q_no
 net_worth = total_fee + total_cost - payout
+
+# Calculate final prices after all trades
+b_final = dynamic_b(q_yes, q_no, base_b)
+final_price_yes = calc_price(q_yes, q_no, b_final)
+final_price_no = 1.0 - final_price_yes
 
 # Results
 st.subheader("Simulation Results")
@@ -307,10 +348,29 @@ else:
     st.markdown(f"**Total Cost Paid:** {total_cost:.2f} BRL")
     st.markdown(f"**Total Fees Earned:** {total_fee:.2f} BRL")
     st.markdown(f"**Final Payout:** {payout:.2f} BRL")
+    st.markdown(f"**Final YES Price:** {final_price_yes:.4f}")
+    st.markdown(f"**Final NO Price:** {final_price_no:.4f}")
 
     # Net Worth with conditional color
     net_worth_color = "red" if net_worth < 0 else "green"
     st.markdown(f"**Net Worth:** <span style='color:{net_worth_color}'>{net_worth:.2f} BRL</span>", unsafe_allow_html=True)
+
+    # Price evolution chart
+    if price_history:
+        st.markdown("**Price Evolution:**")
+        price_df = pd.DataFrame(price_history)
+        
+        fig, ax = plt.subplots(figsize=(10, 6))
+        ax.plot(price_df["Trade"], price_df["YES Price"], label="YES Price", color="#28a745", linewidth=2, marker="o")
+        ax.plot(price_df["Trade"], price_df["NO Price"], label="NO Price", color="#dc3545", linewidth=2, marker="s")
+        ax.set_xlabel("Trade Number")
+        ax.set_ylabel("Price")
+        ax.set_title("Share Price Evolution")
+        ax.legend()
+        ax.grid(True, alpha=0.3)
+        ax.set_ylim([0, 1])
+        plt.tight_layout()
+        st.pyplot(fig)
 
     # Table with scroll (showing approximately 10 rows)
     df = pd.DataFrame(rows)
