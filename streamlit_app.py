@@ -46,6 +46,8 @@ if 'initial_prob_yes' not in st.session_state:
     st.session_state.initial_prob_yes = 50.0
 if 'slider_key_counter' not in st.session_state:
     st.session_state.slider_key_counter = 0
+if 'trades_page' not in st.session_state:
+    st.session_state.trades_page = 1
 
 # Parameters section
 st.subheader("Parameters")
@@ -170,8 +172,79 @@ if st.session_state.show_import_json:
 
 # Display existing trades in a table
 if st.session_state.trades:
-    trades_df = pd.DataFrame(st.session_state.trades, columns=["Direction", "Shares"])
-    st.dataframe(trades_df, height=200, use_container_width=True)
+    # Clear all trades button
+    col_clear, _ = st.columns([1, 4])
+    with col_clear:
+        if st.button("Clear All Trades", use_container_width=True, type="secondary"):
+            st.session_state.trades = []
+            st.session_state.trades_page = 1
+            st.rerun()
+    
+    # Display trades with remove buttons
+    st.markdown("**Trades:**")
+    
+    # Pagination settings
+    trades_per_page = 10
+    total_trades = len(st.session_state.trades)
+    total_pages = max(1, (total_trades + trades_per_page - 1) // trades_per_page)
+    
+    # Ensure current page is valid
+    if st.session_state.trades_page > total_pages:
+        st.session_state.trades_page = total_pages
+    if st.session_state.trades_page < 1:
+        st.session_state.trades_page = 1
+    
+    # Calculate start and end indices for current page
+    start_idx = (st.session_state.trades_page - 1) * trades_per_page
+    end_idx = min(start_idx + trades_per_page, total_trades)
+    
+    # Get trades for current page
+    page_trades = st.session_state.trades[start_idx:end_idx]
+    
+    # Display trades as a list
+    for idx, (direction, shares) in enumerate(page_trades):
+        global_idx = start_idx + idx
+        col_num, col_dir, col_shares, col_remove = st.columns([1, 2, 2, 1])
+        with col_num:
+            st.write(f"**#{global_idx + 1}**")
+        with col_dir:
+            st.write(direction)
+        with col_shares:
+            st.write(f"{shares} shares")
+        with col_remove:
+            if st.button("🗑️", key=f"remove_trade_{global_idx}", use_container_width=True, help=f"Remove trade #{global_idx + 1}"):
+                st.session_state.trades.pop(global_idx)
+                # Adjust page if needed
+                if st.session_state.trades_page > 1 and len(st.session_state.trades) <= (st.session_state.trades_page - 1) * trades_per_page:
+                    st.session_state.trades_page -= 1
+                st.rerun()
+    
+    # Pagination controls
+    st.markdown("---")
+    col_info, col_first, col_prev, col_next, col_last = st.columns([3, 1, 1, 1, 1])
+    
+    with col_info:
+        st.markdown(f"**Page {st.session_state.trades_page} of {total_pages}** (Showing trades {start_idx + 1}-{end_idx} of {total_trades})")
+    
+    with col_first:
+        if st.button("⏮ First", use_container_width=True, disabled=(st.session_state.trades_page == 1)):
+            st.session_state.trades_page = 1
+            st.rerun()
+    
+    with col_prev:
+        if st.button("◀ Previous", use_container_width=True, disabled=(st.session_state.trades_page == 1)):
+            st.session_state.trades_page -= 1
+            st.rerun()
+    
+    with col_next:
+        if st.button("Next ▶", use_container_width=True, disabled=(st.session_state.trades_page == total_pages)):
+            st.session_state.trades_page += 1
+            st.rerun()
+    
+    with col_last:
+        if st.button("Last ⏭", use_container_width=True, disabled=(st.session_state.trades_page == total_pages)):
+            st.session_state.trades_page = total_pages
+            st.rerun()
 else:
     st.info("No trades added yet. Add a trade below or import via JSON.")
 
