@@ -116,14 +116,24 @@ with col_model:
 if st.session_state.show_json_model:
     json_model = {
         "trades": [
-            {"direction": "YES", "shares": 10},
-            {"direction": "NO", "shares": 5},
-            {"direction": "YES", "shares": 20}
+            {"direction": "YES", "shares": 10, "day": 1, "time": "09:30"},
+            {"direction": "NO", "shares": 5, "day": 3, "time": "14:15"},
+            {"direction": "YES", "shares": 20, "day": 7, "time": "17:49"},
+            {"direction": "NO", "shares": 15, "day": 12, "time": "10:00"}
         ]
     }
     st.json(json_model)
     st.code(json.dumps(json_model, indent=2), language="json")
-    st.info("Copy the JSON above and use it in the import field.")
+    st.info("""
+    **Trade format:**
+    - `direction`: "YES" or "NO"
+    - `shares`: number of shares
+    - `day`: day of the trade (optional, accepted but ignored in calculations)
+    - `time`: time of the trade in "HH:MM" format (optional, accepted but ignored in calculations)
+    
+    ⚠️ The `day` and `time` fields are accepted in the JSON but **not considered in calculations**.
+    All trades are calculated using the same initial state.
+    """)
 
 # Import JSON modal
 if st.session_state.show_import_json:
@@ -132,7 +142,7 @@ if st.session_state.show_import_json:
         "Paste JSON here:",
         height=200,
         key="json_input",
-        help="Expected format: {\"trades\": [{\"direction\": \"YES\", \"shares\": 10}, ...]}"
+        help='Expected format: {"trades": [{"direction": "YES", "shares": 10, "day": 1, "time": "09:30"}, ...]}. Day and time are optional and ignored in calculations.'
     )
     
     col_confirm, col_cancel = st.columns(2)
@@ -149,6 +159,7 @@ if st.session_state.show_import_json:
                             if direction in ["YES", "NO"]:
                                 shares = int(trade["shares"])
                                 if shares > 0:
+                                    # day and time are accepted but ignored in calculations
                                     imported_trades.append((direction, shares))
                     
                     if imported_trades:
